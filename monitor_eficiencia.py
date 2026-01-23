@@ -10,7 +10,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 1,
+   "execution_count": 6,
    "id": "cb8191d2-b5bc-4861-bdae-2a239e9664c7",
    "metadata": {},
    "outputs": [],
@@ -170,7 +170,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 8,
+   "execution_count": 7,
    "id": "abecc427-cae8-414b-8805-a2a96836aa60",
    "metadata": {},
    "outputs": [
@@ -621,7 +621,7 @@
        "94   51.571667  "
       ]
      },
-     "execution_count": 8,
+     "execution_count": 7,
      "metadata": {},
      "output_type": "execute_result"
     }
@@ -658,7 +658,7 @@
   },
   {
    "cell_type": "code",
-   "execution_count": 18,
+   "execution_count": 16,
    "id": "973fe835-52ce-4b42-b1aa-6fecb5a2f22f",
    "metadata": {},
    "outputs": [
@@ -666,7 +666,9 @@
      "name": "stdout",
      "output_type": "stream",
      "text": [
-      "⚠️ La pérdida total acumulada por baja eficiencia es: 1127378.40 USD\n"
+      "\n",
+      "⚠️ La pérdida total acumulada por baja eficiencia es: 1127378.40 USD\n",
+      "\n"
      ]
     }
    ],
@@ -690,15 +692,196 @@
     "impacto_total = prioridad_intervencion['barriles_perdidos'].sum()\n",
     "valor_perdida=impacto_total*75\n",
     "\n",
-    "print(f\"⚠️ La pérdida total acumulada por baja eficiencia es: {valor_perdida:.2f} USD\")\n",
+    "print(f\"\\n⚠️ La pérdida total acumulada por baja eficiencia es: {valor_perdida:.2f} USD\\n\")\n",
     "\n",
     "\n"
    ]
   },
   {
+   "cell_type": "markdown",
+   "id": "ed94ea48-ce56-41b5-892b-c661c76e6725",
+   "metadata": {},
+   "source": [
+    "De esos pozos en prioridad_intervencion, *¿cuál es el que más nos hace perder dinero?* No el que tiene menor eficiencia, sino el que tiene la mayor cantidad de barriles perdidos. (A veces un pozo con 60% de eficiencia pierde más barriles que uno con 20% si el primero es un pozo \"gigante\")."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "id": "8b7f1650-50ab-4fd1-898a-743cf415de04",
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\n",
+      "La mayor pérdida registrada es de: 753.0102 bpd\n",
+      "\n",
+      "------------------------------\n",
+      "--- El pozo con mayor lucro cesante es: ---\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "pozo_id                 AN-X074\n",
+       "prod_teorica_bpd     852.369143\n",
+       "prod_real_bpd         99.358986\n",
+       "presion_psi          573.972166\n",
+       "temp_c                80.490203\n",
+       "eficiencia            11.656802\n",
+       "barriles_perdidos    753.010157\n",
+       "Name: 73, dtype: object"
+      ]
+     },
+     "execution_count": 17,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "maxima_perdida = prioridad_intervencion['barriles_perdidos'].max()\n",
+    "print(f\"\\nLa mayor pérdida registrada es de: {maxima_perdida:.4f} bpd\\n\")\n",
+    "print('-'*30)\n",
+    "# Busca el índice del valor máximo y extrae la fila completa\n",
+    "pozo_critico = prioridad_intervencion.loc[prioridad_intervencion['barriles_perdidos'].idxmax()]\n",
+    "\n",
+    "print(\"--- El pozo con mayor lucro cesante es: ---\")\n",
+    "pozo_critico"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "0e89ba42-cdc1-4142-b914-7da3769e0a3a",
+   "metadata": {},
+   "source": [
+    "#### El método visual: .sort_values()\n",
+    "Para ver el **\"Top 5\"** de los que más pérdida ocasionan para priorizar reparaciones:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "id": "b2ee852d-c995-40ed-be6a-bac1e057064b",
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>pozo_id</th>\n",
+       "      <th>prod_teorica_bpd</th>\n",
+       "      <th>prod_real_bpd</th>\n",
+       "      <th>presion_psi</th>\n",
+       "      <th>temp_c</th>\n",
+       "      <th>eficiencia</th>\n",
+       "      <th>barriles_perdidos</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>73</th>\n",
+       "      <td>AN-X074</td>\n",
+       "      <td>852.369143</td>\n",
+       "      <td>99.358986</td>\n",
+       "      <td>573.972166</td>\n",
+       "      <td>80.490203</td>\n",
+       "      <td>11.656802</td>\n",
+       "      <td>753.010157</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>11</th>\n",
+       "      <td>AN-X012</td>\n",
+       "      <td>975.927882</td>\n",
+       "      <td>278.977030</td>\n",
+       "      <td>507.568559</td>\n",
+       "      <td>62.353691</td>\n",
+       "      <td>28.585824</td>\n",
+       "      <td>696.950852</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>52</th>\n",
+       "      <td>AN-X053</td>\n",
+       "      <td>951.599153</td>\n",
+       "      <td>265.915898</td>\n",
+       "      <td>555.341001</td>\n",
+       "      <td>79.760809</td>\n",
+       "      <td>27.944108</td>\n",
+       "      <td>685.683256</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>55</th>\n",
+       "      <td>AN-X056</td>\n",
+       "      <td>937.499388</td>\n",
+       "      <td>343.644217</td>\n",
+       "      <td>467.040379</td>\n",
+       "      <td>79.272578</td>\n",
+       "      <td>36.655407</td>\n",
+       "      <td>593.855171</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>9</th>\n",
+       "      <td>AN-X010</td>\n",
+       "      <td>766.458062</td>\n",
+       "      <td>211.583928</td>\n",
+       "      <td>348.242415</td>\n",
+       "      <td>68.124968</td>\n",
+       "      <td>27.605415</td>\n",
+       "      <td>554.874134</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "    pozo_id  prod_teorica_bpd  prod_real_bpd  presion_psi     temp_c  \\\n",
+       "73  AN-X074        852.369143      99.358986   573.972166  80.490203   \n",
+       "11  AN-X012        975.927882     278.977030   507.568559  62.353691   \n",
+       "52  AN-X053        951.599153     265.915898   555.341001  79.760809   \n",
+       "55  AN-X056        937.499388     343.644217   467.040379  79.272578   \n",
+       "9   AN-X010        766.458062     211.583928   348.242415  68.124968   \n",
+       "\n",
+       "    eficiencia  barriles_perdidos  \n",
+       "73   11.656802         753.010157  \n",
+       "11   28.585824         696.950852  \n",
+       "52   27.944108         685.683256  \n",
+       "55   36.655407         593.855171  \n",
+       "9    27.605415         554.874134  "
+      ]
+     },
+     "execution_count": 19,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# Ordena de mayor a menor y muestra los primeros 5\n",
+    "top_perdidas = prioridad_intervencion.sort_values(by='barriles_perdidos', ascending=False)\n",
+    "top_perdidas.head(5)\n"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
-   "id": "ed94ea48-ce56-41b5-892b-c661c76e6725",
+   "id": "7a61416d-6fbd-4ae2-8d24-7123055bf0be",
    "metadata": {},
    "outputs": [],
    "source": []
