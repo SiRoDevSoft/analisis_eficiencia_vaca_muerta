@@ -1,6 +1,10 @@
 import pandas as pd
 import numpy as np
 
+#-----------------------------------------------------------------------------------------------------------------#
+# Funcion para PROCESAR DATOS DE PRODUCCIÓN
+#-----------------------------------------------------------------------------------------------------------------#
+
 def procesar_datos_produccion(nombre_archivo):
     """
     Busca el archivo en la carpeta 'datos' y calcula la eficiencia.
@@ -24,3 +28,24 @@ def procesar_datos_produccion(nombre_archivo):
     except FileNotFoundError:
         print(f"❌ Error: No se encuentra el archivo en {ruta_completa}")
         return None
+
+#-----------------------------------------------------------------------------------------------------------------#
+# Funcion para REPORTE .PDF
+#-----------------------------------------------------------------------------------------------------------------#
+
+def generar_resumen_ejecutivo(df):
+    """
+    Genera métricas clave para la toma de decisiones.
+    """
+    if df is None or df.empty:
+        return None
+    
+    resumen = {
+        'eficiencia_promedio': df['eficiencia'].mean(),
+        'total_barriles_perdidos': df['barriles_perdidos'].sum(),
+        'pozo_critico_id': df.sort_values(by='barriles_perdidos', ascending=False).iloc[0]['pozo_id'],
+        'cantidad_pozos_alerta': len(df[df['eficiencia'] < 70]),
+        'potencial_mejora_usd': df['barriles_perdidos'].sum() * 75 # Supongamos el barril a 75 USD
+    }
+    
+    return resumen
