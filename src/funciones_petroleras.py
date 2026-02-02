@@ -117,33 +117,134 @@ def calcular_produccion_neta(df):
     
     return df
 
+#-----------------------------------------------------------------------------------------------------------------#
+# Funcion para CALCULAR El Factor de Emulsión ($F_e$)
+#-----------------------------------------------------------------------------------------------------------------#
+# En la industria, la emulsión no es lineal. 
+# Se vuelve más difícil de romper (requiere más químico) cuanto más agua hay y más baja es la temperatura
+
+def calcular_factor_emulsion(water_cut, temp_c):
+    """
+    Calcula el Factor de Emulsión basado en condiciones de fondo.
+    A mayor WC y menor Temp, el factor aumenta (más difícil de separar).
+    """
+    # Una fórmula empírica para simular la viscosidad de la emulsión
+    factor = (water_cut / 100) * (100 / max(temp_c, 1))
+    return round(factor, 4)
+
+def estimar_costo_quimico(water_cut, temp_c, volumen_total):
+    """
+    Estima el costo en USD de desemulsionante necesario.
+    """
+    fe = calcular_factor_emulsion(water_cut, temp_c)
+    # Supongamos 0.5 USD por unidad de factor por barril
+    costo = fe * volumen_total * 0.5 
+    return round(costo, 2)
+
+
+
+def calcular_metricas_emulsion(df):
+    """
+    Calcula el Factor de Emulsión y el costo de tratamiento.
+    Lógica: A menor temperatura y mayor Water Cut, la emulsión es más 'apretada' 
+    y requiere más inversión en desemulsionantes.
+    """
+    # 1. Factor de Emulsión (F_e): Escala de 0 a 10
+    # Usamos una constante de viscosidad simulada
+    df['factor_emulsion'] = (df['water_cut'] / 100) * (80 / df['temp_c'])
+    
+    # 2. Costo Químico (USD): 
+    # Supongamos que el químico cuesta 1.2 USD por unidad de factor por barril total
+    df['costo_quimico_usd'] = df['factor_emulsion'] * df['q_petroleo'] * 1.2
+    
+    return df
+
+
+#-----------------------------------------------------------------------------------------------------------------#
+# Funcion para CALCULAR las Curvas de Declinación de Arps
+#-----------------------------------------------------------------------------------------------------------------#
+
+def predecir_declinacion_arps(q_inicial, tasa_d, tiempo_dias):
+    """
+    Calcula la producción futura usando Declinación Exponencial (Arps).
+    q_inicial: Producción actual (bbl/d)
+    tasa_d: Tasa de declinación diaria (ej: 0.003)
+    tiempo_dias: Días a proyectar hacia adelante
+    """
+    # Fórmula: q(t) = qi * e^(-D*t)
+    produccion_proyectada = q_inicial * np.exp(-tasa_d * tiempo_dias)
+    return round(produccion_proyectada, 2)
+
+
+#-----------------------------------------------------------------------------------------------------------------#
+# Funcion para CALCULAR LIMITE ECONÓMICO
+#-----------------------------------------------------------------------------------------------------------------#
+
+def calcular_limite_economico(produccion_proyectada, costo_op_diario, precio_barril=70):
+    """
+    Determina en qué punto la ganancia por petróleo ya no cubre los costos.
+    """
+    dias = len(produccion_proyectada)
+    dia_limite = None
+    
+    for t in range(dias):
+        ingreso = produccion_proyectada[t] * precio_barril
+        if ingreso <= costo_op_diario:
+            dia_limite = t
+            break
+            
+    return dia_limite
+
+
+
+# if __name__ == "__main__":
+#     print("🧪 Iniciando prueba de laboratorio INTEGRADA...")
+    
+#     # 1. Carga (Lo que ya tenías)
+#     df_lab = procesar_datos_produccion("datos_campo.csv")
+    
+#     if df_lab is not None:
+#         # 2. Lógica de ayer (Categorías y Neto)
+#         df_lab = categorizar_pozos(df_lab)
+#         df_lab['water_cut'] = [10, 85, 5, 95, 0] 
+#         df_lab = calcular_produccion_neta(df_lab)
+        
+#         # --- 🆕 LO NUEVO DE HOY: Emulsión y Temperatura ---
+#         print("🛠️ Calculando Factor de Emulsión...")
+#         # Simulamos temperatura para la prueba (60°C es estándar en tratamiento)
+#         df_lab['temp_c'] = [65, 55, 70, 45, 60] 
+        
+#         # Invocamos la función de hoy
+#         df_lab = calcular_metricas_emulsion(df_lab)
+        
+#         # 4. Mostramos el ranking final con TODO
+#         print("✅ Resultado del Análisis Completo:")
+#         columnas_finales = [
+#             'pozo_id', 'prod_neta_petroleo', 'categoria', 
+#             'factor_emulsion', 'costo_quimico_usd'
+#         ]
+#         print(df_lab[columnas_finales])
+#     else:
+#         print("❌ No se pudo cargar el archivo de prueba.")
+    
+#     print("🏁 Prueba finalizada.")
+
+# ... (tus funciones anteriores: calcular_factor_emulsion, etc.)
 
 
 if __name__ == "__main__":
-    print("🧪 Iniciando prueba de laboratorio...")
+    import pandas as pd
+    # Creamos un pozo de prueba: 500 bbl, 30% agua, 60 grados
+    test_data = {
+        'pozo_id': ['TEST-01'],
+        'q_petroleo': [500],
+        'water_cut': [30],
+        'temp_c': [60]
+    }
+    df_test = pd.DataFrame(test_data)
     
-    # 1. Cargamos el archivo (esto crea el DataFrame necesario)
-    # Asegurate de que la ruta sea correcta para cuando corrés desde la carpeta raíz
-    df_lab = procesar_datos_produccion("datos_campo.csv")
+    # Ejecutamos la lógica
+    resultado = calcular_metricas_emulsion(df_test)
     
-    if df_lab is not None:
-        # 2. Ahora sí, usamos la nueva función de categorías
-        df_lab = categorizar_pozos(df_lab)
-        
-        # # 3. Mostramos el resultado para verificar
-        # print("✅ Resultado del procesamiento:")
-        # print(df_lab[['pozo_id', 'eficiencia', 'categoria']].head())
-
-        # 3. Calculamos Petróleo Neto
-        # Simulamos un Water Cut variable para que la prueba sea real
-        df_lab['water_cut'] = [10, 85, 5, 95, 0] # Inventamos datos para cada pozo
-        df_lab = calcular_produccion_neta(df_lab)
-        
-        # 4. Mostramos el ranking final
-        print("✅ Resultado del Análisis de Producción Neta:")
-        columnas_interes = ['pozo_id', 'prod_real_bpd', 'water_cut', 'prod_neta_petroleo', 'categoria']
-        print(df_lab[columnas_interes])
-    else:
-        print("❌ No se pudo cargar el archivo de prueba.")
-    
-    print("🏁 Prueba finalizada.")
+    print("🧪 PRUEBA DE LABORATORIO:")
+    print(resultado[['pozo_id', 'factor_emulsion', 'costo_quimico_usd']])   
