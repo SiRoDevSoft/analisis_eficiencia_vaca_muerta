@@ -27,13 +27,16 @@ class ReportePetroleroPro(FPDF):
 
 def generar_reporte_avanzado(df, df_historico, dia_quiebre, produccion_futura):
 
-    # 1. DEFINICIÓN DE RUTAS (Al principio para evitar errores)
-    base_path = os.path.dirname(os.path.abspath(__file__))
-    ruta_assets = os.path.join(base_path, "..", "assets")
-    if not os.path.exists(ruta_assets):
-        os.makedirs(ruta_assets)
-    ruta_img = os.path.join(ruta_assets, "temp_grafico.png")
-    ruta_final = os.path.join(ruta_assets, "Reporte_Final_YPF_2026.pdf")
+
+    # 1. DEFINICIÓN DE RUTAS PROFESIONAL
+    # Usamos la raíz del proyecto para assets y una carpeta temporal para el gráfico
+    base_path = os.getcwd() # Obtiene la raíz donde está main.py
+    ruta_assets = os.path.join(base_path, "assets")
+
+    # El gráfico lo guardamos en el sistema temporal del servidor
+    ruta_img = "temp_grafico.png" 
+    # El PDF final lo guardamos donde Streamlit pueda encontrarlo
+    ruta_final = "Reporte_Final_YPF_2026.pdf"
 
     pdf = ReportePetroleroPro()
     pdf.add_page()
