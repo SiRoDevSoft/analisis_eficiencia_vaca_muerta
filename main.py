@@ -5,8 +5,11 @@ import numpy as np
 import sys
 import os
 import pandas as pd
+
+
 from src.funciones_petroleras import predecir_declinacion_arps 
 from src.generador_reportes import crear_informe_ejecutivo
+
 
 st.set_page_config(layout="wide", page_title="Monitor Vaca Muerta")
 
