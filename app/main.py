@@ -5,8 +5,8 @@ import numpy as np
 import sys
 import os
 import pandas as pd
+from src.funciones_petroleras import predecir_declinacion_arps 
 from src.generador_reportes import crear_informe_ejecutivo
-
 
 st.set_page_config(layout="wide", page_title="Monitor Vaca Muerta")
 
@@ -27,8 +27,8 @@ def cargar_datos_csv():
 qi_dinamico, bsw_dinamico = cargar_datos_csv()
 
 # Configuración de rutas para importar tus funciones de ingeniería
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from src.funciones_petroleras import predecir_declinacion_arps 
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 # --- INTERFAZ ---
 st.title("🛢️ Centro de Control Operativo - Vaca Muerta")
