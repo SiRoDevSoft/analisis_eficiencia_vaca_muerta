@@ -1,9 +1,14 @@
+from datetime import datetime
 import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
 import sys
 import os
 import pandas as pd
+from src.generador_reportes import crear_informe_ejecutivo
+
+# El "Hack" rápido en el código para manejar errores en las rutas
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 st.set_page_config(layout="wide", page_title="Monitor Vaca Muerta")
 
@@ -47,6 +52,8 @@ qi = 874.1  # Producción inicial según reporte
 di = 0.0007 # Tasa de declinación nominal diaria
 prod_proyectada = qi * np.exp(-di * dias)
 
+
+
 # --- VISUALIZACIÓN ---
 fig = go.Figure()
 
@@ -86,6 +93,8 @@ else:
     st.success(f"✅ **OPERACIÓN RENTABLE:** Bajo este escenario de USD {precio_brent}, el pozo se mantiene por encima del punto de equilibrio durante todo el año.")
 
 
+
+
 # --- CÁLCULO DE CASH FLOW ---
 st.subheader("📊 Análisis de Flujo de Caja Neto")
 
@@ -115,6 +124,7 @@ with col_cf2:
 st.sidebar.subheader("Costos Operativos")
 opex_base = st.sidebar.number_input("OPEX Fijo Mensual (USD)", value=50000)
 costo_tratamiento_bbl = st.sidebar.slider("Costo Tratamiento (USD/bbl fluido)", 0.5, 5.0, 1.5)
+
 
 # --- 2. CÁLCULO DE CASH FLOW REALISTA ---
 # Suponiendo un corte de agua (BSW) del 30% constante para este ejemplo
@@ -146,6 +156,34 @@ fig_cash = go.Figure()
 fig_cash.add_trace(go.Bar(x=dias, y=cash_flow_diario, name='Flujo Neto Diario', marker_color='lightgreen'))
 fig_cash.update_layout(title="Flujo de Caja Diario (Neto)", template="plotly_dark")
 st.plotly_chart(fig_cash, use_container_width=True)
+
+
+# Empaquetamos la información para el reporte
+datos_para_reporte = {
+    "qi": qi,
+    "brent": precio_brent,
+    "q_limite": q_limite,
+    "opex": opex_total_diario.mean(), # Usamos el promedio diario
+    "estado": "OPERACION RENTABLE" if dia_final == 200 else f"ALERTA DE CIERRE (Día {dia_final})",
+    "dia_quiebre": dia_final
+}
+
+st.sidebar.divider()
+st.sidebar.subheader("Reportes")
+
+# Generamos el PDF en memoria
+try:
+    pdf_bytes = crear_informe_ejecutivo(datos_para_reporte)
+
+    st.sidebar.download_button(
+        label="📥 Descargar Reporte PDF",
+        data=pdf_bytes,
+        file_name=f"Reporte_Produccion_2026_{datetime.now().strftime('%d%m%y')}.pdf",
+        mime="application/pdf"
+    )
+except Exception as e:
+    st.sidebar.error("Error al generar PDF. Verifique fpdf2.")
+
 
 # Una línea divisoria para separar el análisis de la firma
 

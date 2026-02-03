@@ -37,3 +37,5 @@ st.plotly_chart(fig, use_container_width=True)
 
 # 3. Alerta de Negocio
 st.error("⚠️ Alerta: Según el Brent seleccionado, el pozo deja de ser rentable en el día 179")
+
+# Para ejecutarlo, poné esto en la terminal: streamlit run app/main.py
