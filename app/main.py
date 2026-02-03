@@ -7,8 +7,6 @@ import os
 import pandas as pd
 from src.generador_reportes import crear_informe_ejecutivo
 
-# El "Hack" rápido en el código para manejar errores en las rutas
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 st.set_page_config(layout="wide", page_title="Monitor Vaca Muerta")
 
