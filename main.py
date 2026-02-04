@@ -2,36 +2,32 @@ from datetime import datetime
 import streamlit as st
 import plotly.graph_objects as go
 import numpy as np
-import sys
-import os
 import pandas as pd
 
-# sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from src.funciones_petroleras import predecir_declinacion_arps 
 from src.generador_reportes import crear_informe_ejecutivo
+from src.petro_logic import calcular_q_limite, proyectar_produccion, calcular_flujo_caja
 
 
 st.set_page_config(layout="wide", page_title="Monitor Vaca Muerta")
 
-# --- 1. NUEVA SECCIÓN: LECTURA DE DATOS REALES ---
+# --- 1. LECTURA DE DATOS REALES ---
 @st.cache_data
 def cargar_datos_csv():
     try:
         df_hist = pd.read_csv('datos/produccion_historica.csv')
-        # Extraemos los últimos valores reales de tus columnas
         q_inicio = df_hist['q_petroleo'].iloc[-1]
-        bsw_real = df_hist['water_cut'].iloc[-1]
+       
+        # NORMALIZACIÓN: Si viene como 32.97, lo llevamos a 0.3297
+        bsw_raw = df_hist['water_cut'].iloc[-1]
+        bsw_real = bsw_raw / 100 if bsw_raw > 1 else bsw_raw
+        
         return q_inicio, bsw_real
     except Exception as e:
-        # Si el archivo falla, usamos tus valores originales como respaldo (Safety)
         return 874.1, 0.30
 
 # Ejecutamos la carga
-qi_dinamico, bsw_dinamico = cargar_datos_csv()
-
-# Configuración de rutas para importar tus funciones de ingeniería
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+qi_real, bsw = cargar_datos_csv()
 
 # --- INTERFAZ ---
 st.title("🛢️ Centro de Control Operativo - Vaca Muerta")
@@ -42,18 +38,28 @@ precio_brent = st.sidebar.slider("Precio Brent (USD/bbl)", 40, 120, 75)
 opex_diario = 58000  # Valor fijo según analisis del reporte anterior
 regalias = 0.12
 
+st.sidebar.subheader("Costos Operativos")
+opex_base = st.sidebar.number_input("OPEX Fijo Mensual (USD)", value=50000)
+costo_tratamiento_bbl = st.sidebar.slider("Costo Tratamiento (USD/bbl fluido)", 0.5, 5.0, 1.5)
+
 # --- LÓGICA DE INGENIERÍA ---
+m_std=30  # mes estándar de 30 días
 
-# Calculamos el Qel (Barriles mínimos para no perder plata)
-q_limite = opex_diario / (precio_brent * (1 - regalias))
+# A. Cálculo de Punto de Equilibrio
+q_limite = calcular_q_limite(opex_base/m_std, precio_brent, regalias)
 
-# Datos de producción (Simulando 200 días de proyección)
-dias = np.arange(0, 200)
-qi = 874.1  # Producción inicial según reporte
-di = 0.0007 # Tasa de declinación nominal diaria
-prod_proyectada = qi * np.exp(-di * dias)
+# B. Proyección de Producción (200 días)
+dias, prod_proyectada = proyectar_produccion(qi=qi_real, di=0.005)
+
+# C. Cálculo de OPEX Variable (Emulsión)
+
+produccion_fluido = prod_proyectada / (1 - bsw)
+costo_emulsion_diario = produccion_fluido * costo_tratamiento_bbl
+opex_total_diario = (opex_base / m_std) + costo_emulsion_diario
 
 
+# D. Flujo de Caja
+cash_flow_diario, cash_flow_acumulado = calcular_flujo_caja(prod_proyectada, precio_brent, opex_total_diario, regalias)
 
 # --- VISUALIZACIÓN ---
 fig = go.Figure()
@@ -76,10 +82,11 @@ with col1:
 with col2:
     # Encontrar el día donde la producción cae por debajo del límite
     dia_quiebre = np.where(prod_proyectada < q_limite)[0]
-    dia_final = dia_quiebre[0] if len(dia_quiebre) > 0 else 200
+    dia_final = dia_quiebre[0] if len(dia_quiebre) > 0 else 730
     st.metric("Días de Vida Útil", f"{dia_final} días")
 
-
+# Línea de depuración (Borrar después)
+# st.write(f"⚠️ DEBUG: dia final: {dia_final} | Brent calculado: {precio_brent:.2f}")
 if dia_final == 0:
     st.error(f"🚨 **INVIABLE:** Con Brent a USD {precio_brent}, los costos operativos (OPEX) superan los ingresos desde el inicio. El pozo genera pérdidas inmediatas.")
     st.metric("Déficit Inicial", f"{prod_proyectada[0] - q_limite:.2f} bbl/d", delta_color="inverse")
@@ -99,13 +106,6 @@ else:
 # --- CÁLCULO DE CASH FLOW ---
 st.subheader("📊 Análisis de Flujo de Caja Neto")
 
-# Calculamos el ingreso neto por día (Ingreso - Regalías - Costos)
-ingresos_diarios = prod_proyectada * precio_brent * (1 - regalias)
-cash_flow_diario = ingresos_diarios - opex_diario
-
-# Cash Flow Acumulado (La "bolsa" de dinero que se va llenando)
-cash_flow_acumulado = np.cumsum(cash_flow_diario)
-
 # --- VISUALIZACIÓN ---
 col_cf1, col_cf2 = st.columns(2)
 
@@ -121,27 +121,6 @@ with col_cf2:
     fig_acum.update_layout(title="Rentabilidad Acumulada Anual (USD)", template="plotly_dark")
     st.plotly_chart(fig_acum, use_container_width=True)
 
-# --- 1. NUEVAS VARIABLES EN EL SIDEBAR ---
-st.sidebar.subheader("Costos Operativos")
-opex_base = st.sidebar.number_input("OPEX Fijo Mensual (USD)", value=50000)
-costo_tratamiento_bbl = st.sidebar.slider("Costo Tratamiento (USD/bbl fluido)", 0.5, 5.0, 1.5)
-
-
-# --- 2. CÁLCULO DE CASH FLOW REALISTA ---
-# Suponiendo un corte de agua (BSW) del 30% constante para este ejemplo
-bsw = 0.30 
-produccion_fluido = prod_proyectada / (1 - bsw)
-
-# El costo de emulsión sube si producimos más fluido
-costo_emulsion_diario = produccion_fluido * costo_tratamiento_bbl
-opex_total_diario = (opex_base / 30) + costo_emulsion_diario
-
-# Ingreso Neto (Post-Regalías)
-ingreso_neto_diario = prod_proyectada * precio_brent * (1 - regalias)
-
-# FLUJO DE CAJA FINAL
-cash_flow_diario = ingreso_neto_diario - opex_total_diario
-cash_flow_acumulado = np.cumsum(cash_flow_diario)
 
 # --- 3. VISUALIZACIÓN ---
 st.write("### 💰 Cash Flow con Costo de Emulsión Variable")
@@ -161,11 +140,11 @@ st.plotly_chart(fig_cash, use_container_width=True)
 
 # Empaquetamos la información para el reporte
 datos_para_reporte = {
-    "qi": qi,
+    "qi": qi_real,
     "brent": precio_brent,
     "q_limite": q_limite,
     "opex": opex_total_diario.mean(), # Usamos el promedio diario
-    "estado": "OPERACION RENTABLE" if dia_final == 200 else f"ALERTA DE CIERRE (Día {dia_final})",
+    "estado": "OPERACION RENTABLE" if dia_final == 730 else f"ALERTA DE CIERRE (Día {dia_final})",
     "dia_quiebre": dia_final
 }
 
@@ -192,9 +171,7 @@ st.divider()
 
 # Ajustamos el ancho de las columnas (1 parte para imagen, 4 para el texto)
 col_perfil, col_cita = st.columns([1, 4])
-
 with col_perfil:
-    
     # El parámetro use_container_width asegura que se adapte al espacio
     st.image("assets/img/imagen.png", width=120)
 
