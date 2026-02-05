@@ -6,6 +6,7 @@ import pandas as pd
 
 from src.petro_logic import calcular_q_limite
 
+
 st.set_page_config(layout="wide", page_title="Master Dashboard - Cuenca Neuquina")
 
 # --- LECTURA DE VOLUMEN CRÍTICO (Tus 100 pozos) ---
@@ -23,6 +24,19 @@ def cargar_datos_masivos():
         return None
 
 df_campo = cargar_datos_masivos()
+
+# Esto es lo que nos faltó para redondear la sesión de hoy
+def limpiar_datos_operativos(df):
+    # 1. Filtramos producciones imposibles (menores a 0)
+    df['prod_real_bpd'] = df['prod_real_bpd'].clip(lower=0)
+    
+    # 2. Manejo de Nones: Si no hay dato, asumimos que el pozo está parado (0)
+    df['prod_real_bpd'] = df['prod_real_bpd'].fillna(0)
+    
+    return df
+
+# Aplicarlo antes de calcular el EBITDA
+df_campo = limpiar_datos_operativos(df_campo)
 
 # --- 2. CONTROLES DE ESCENARIO MACRO ---
 st.title("🛢️ Consola de Control de Activos - 100 Pozos")
@@ -73,3 +87,12 @@ else:
 st.dataframe(df_ver.sort_values(by='Margen_BPD', ascending=True), use_container_width=True)
 
 
+# --- CONECTOR A DETALLE ---
+st.divider()
+st.subheader("🔍 Análisis Profundo")
+pozo_elegido = st.selectbox("Seleccione un pozo para ver su detalle técnico:", df_campo['pozo_id'])
+
+if st.button("Ver Análisis Detallado"):
+    st.session_state['pozo_seleccionado'] = pozo_elegido
+    st.switch_page("pages/02_Detalle_Pozo.py")
+   

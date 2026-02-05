@@ -1,194 +1,90 @@
-from datetime import datetime
 import streamlit as st
-import plotly.graph_objects as go
-import numpy as np
 import pandas as pd
+import plotly.express as px
+from src.petro_logic import calcular_q_limite
 
-from src.funciones_petroleras import predecir_declinacion_arps 
-from src.generador_reportes import crear_informe_ejecutivo
-from src.petro_logic import calcular_q_limite, proyectar_produccion, calcular_flujo_caja
+st.set_page_config(page_title="Proyecto Añelo 2026", layout="wide")
+st.title("🛢️ Sistema de Gestión de Activos - VACA MUERTA 2026")
 
 
-st.set_page_config(layout="wide", page_title="Monitor Vaca Muerta")
+df_campo = pd.read_csv('datos/datos_campo_masivos.csv')
 
-# --- 1. LECTURA DE DATOS REALES ---
-@st.cache_data
-def cargar_datos_csv():
-    try:
-        df_hist = pd.read_csv('datos/produccion_historica.csv')
-        q_inicio = df_hist['q_petroleo'].iloc[-1]
-       
-        # NORMALIZACIÓN: Si viene como 32.97, lo llevamos a 0.3297
-        bsw_raw = df_hist['water_cut'].iloc[-1]
-        bsw_real = bsw_raw / 100 if bsw_raw > 1 else bsw_raw
-        
-        return q_inicio, bsw_real
-    except Exception as e:
-        return 874.1, 0.30
-
-# Ejecutamos la carga
-qi_real, bsw = cargar_datos_csv()
-
-# --- INTERFAZ ---
-st.title("🛢️ Centro de Control Operativo - Vaca Muerta")
-
-# Parámetros en el Sidebar
-st.sidebar.header("Variables de Mercado")
+st.sidebar.header("Condiciones de Mercado")
 precio_brent = st.sidebar.slider("Precio Brent (USD/bbl)", 40, 120, 75)
-opex_diario = 58000  # Valor fijo según analisis del reporte anterior
 regalias = 0.12
+opex_fijo_mensual = 50000 
 
-st.sidebar.subheader("Costos Operativos")
-opex_base = st.sidebar.number_input("OPEX Fijo Mensual (USD)", value=50000)
-costo_tratamiento_bbl = st.sidebar.slider("Costo Tratamiento (USD/bbl fluido)", 0.5, 5.0, 1.5)
+q_lim_estandar = calcular_q_limite(opex_fijo_mensual/30, precio_brent, regalias)
 
-# --- LÓGICA DE INGENIERÍA ---
-m_std=30  # mes estándar de 30 días
+# Filtramos pozos saludables (por encima del límite)
+pozos_activos = df_campo[df_campo['prod_real_bpd'] > q_lim_estandar]
+prod_total = df_campo['prod_real_bpd'].sum()
 
-# A. Cálculo de Punto de Equilibrio
-q_limite = calcular_q_limite(opex_base/m_std, precio_brent, regalias)
+df_campo['rentable'] = df_campo['prod_real_bpd'] > q_lim_estandar
+pozos_riesgo = df_campo[df_campo['rentable'] == False]
 
-# B. Proyección de Producción (200 días)
-dias, prod_proyectada = proyectar_produccion(qi=qi_real, di=0.005)
+# --- INTERFAZ DINÁMICA ---
 
-# C. Cálculo de OPEX Variable (Emulsión)
+col1, col2, col3, col4, col5 = st.columns(5)
 
-produccion_fluido = prod_proyectada / (1 - bsw)
-costo_emulsion_diario = produccion_fluido * costo_tratamiento_bbl
-opex_total_diario = (opex_base / m_std) + costo_emulsion_diario
-
-
-# D. Flujo de Caja
-cash_flow_diario, cash_flow_acumulado = calcular_flujo_caja(prod_proyectada, precio_brent, opex_total_diario, regalias)
-
-# --- VISUALIZACIÓN ---
-fig = go.Figure()
-
-# Curva de producción
-fig.add_trace(go.Scatter(x=dias, y=prod_proyectada, name='Producción Proyectada', line=dict(color='#FF4B4B', width=3)))
-
-# Línea dinámica de Límite Económico
-fig.add_hline(y=q_limite, line_dash="dash", line_color="#00FF00", 
-              annotation_text=f"Límite Económico: {q_limite:.1f} bbl/d", 
-              annotation_position="bottom right")
-
-fig.update_layout(title='Análisis de Viabilidad Económica', xaxis_title='Días desde hoy', yaxis_title='Producción (bbl/d)', template="plotly_dark")
-st.plotly_chart(fig, use_container_width=True)
-
-# --- MÉTRICAS CRÍTICAS ---
-col1, col2 = st.columns(2)
 with col1:
-    st.metric("Punto de Quiebre (Qel)", f"{q_limite:.2f} bbl/d")
+    st.metric("Total Activos", f"{len(df_campo)} Pozos", "Cuenca Neuquina")
 with col2:
-    # Encontrar el día donde la producción cae por debajo del límite
-    dia_quiebre = np.where(prod_proyectada < q_limite)[0]
-    dia_final = dia_quiebre[0] if len(dia_quiebre) > 0 else 730
-    st.metric("Días de Vida Útil", f"{dia_final} días")
+    st.metric("Producción Campo", f"{prod_total:,.0f} bbl/d", f"{prod_total/len(df_campo):,.1f} avg/pozo")
+with col3:
+    porcentaje_salud = (len(pozos_activos) / len(df_campo)) * 100
+    st.metric("Eficiencia Económica", f"{porcentaje_salud:.1f}%", f"{len(pozos_activos)} pozos rentables")
+with col4:
+    st.metric("Pozos en Alerta", f"{len(pozos_riesgo)}", f"{(len(pozos_riesgo)/len(df_campo))*100:.1f}% del campo", delta_color="inverse")
+with col5:
+    st.metric("Límite Económico", f"{q_lim_estandar:.1f} bpd", delta=f"{precio_brent} USD/bbl", delta_color="off")
 
-# Línea de depuración (Borrar después)
-# st.write(f"⚠️ DEBUG: dia final: {dia_final} | Brent calculado: {precio_brent:.2f}")
-if dia_final == 0:
-    st.error(f"🚨 **INVIABLE:** Con Brent a USD {precio_brent}, los costos operativos (OPEX) superan los ingresos desde el inicio. El pozo genera pérdidas inmediatas.")
-    st.metric("Déficit Inicial", f"{prod_proyectada[0] - q_limite:.2f} bbl/d", delta_color="inverse")
-    
-elif dia_final < 100:
-    st.warning(f"⚠️ **ALERTA DE CIERRE PRÓXIMO:** El pozo entrará en zona de pérdida en apenas {dia_final} días. Evaluar optimización de OPEX urgente.")
+st.divider()
 
-elif dia_final < 365:
-    st.info(f"📅 **LÍMITE ECONÓMICO DETECTADO:** El pozo es rentable actualmente, pero se estima su cierre técnico en el día {dia_final}.")
+# Gráfico dinámico: Distribución de Producción
+st.subheader("📊 Salud del Yacimiento")
 
-else:
-    st.success(f"✅ **OPERACIÓN RENTABLE:** Bajo este escenario de USD {precio_brent}, el pozo se mantiene por encima del punto de equilibrio durante todo el año.")
+fig_dist = px.histogram(df_campo, x="prod_real_bpd", 
+                         color="rentable",
+                         title="Distribución de Pozos según Rentabilidad Actual",
+                         labels={'prod_real_bpd': 'Producción (bpd)', 'rentable': 'Es Rentable'},
+                         color_discrete_map={True: '#00FF00', False: '#FF4B4B'},
+                         template="plotly_dark")
 
+# Línea de referencia del límite económico en el gráfico
+fig_dist.add_vline(x=q_lim_estandar, line_dash="dash", line_color="yellow", annotation_text="Punto de Equilibrio")
 
+st.plotly_chart(fig_dist, use_container_width=True)
 
-
-# --- CÁLCULO DE CASH FLOW ---
-st.subheader("📊 Análisis de Flujo de Caja Neto")
-
-# --- VISUALIZACIÓN ---
-col_cf1, col_cf2 = st.columns(2)
-
-with col_cf1:
-    fig_cf = go.Figure()
-    fig_cf.add_trace(go.Bar(x=dias, y=cash_flow_diario, name='CF Diario', marker_color='royalblue'))
-    fig_cf.update_layout(title="Flujo de Caja Diario (USD)", template="plotly_dark")
-    st.plotly_chart(fig_cf, use_container_width=True)
-
-with col_cf2:
-    fig_acum = go.Figure()
-    fig_acum.add_trace(go.Scatter(x=dias, y=cash_flow_acumulado, fill='tozeroy', name='CF Acumulado', line=dict(color='gold')))
-    fig_acum.update_layout(title="Rentabilidad Acumulada Anual (USD)", template="plotly_dark")
-    st.plotly_chart(fig_acum, use_container_width=True)
+st.divider()
 
 
-# --- 3. VISUALIZACIÓN ---
-st.write("### 💰 Cash Flow con Costo de Emulsión Variable")
-col_m1, col_m2 = st.columns(2)
-
-with col_m1:
-    st.metric("OPEX Diario Promedio", f"USD {opex_total_diario.mean():,.2f}")
-with col_m2:
-    st.metric("EBITDA Proyectado Anual", f"USD {cash_flow_acumulado[-1]:,.2f}")
-
-# Gráfico de barras para el flujo diario
-fig_cash = go.Figure()
-fig_cash.add_trace(go.Bar(x=dias, y=cash_flow_diario, name='Flujo Neto Diario', marker_color='lightgreen'))
-fig_cash.update_layout(title="Flujo de Caja Diario (Neto)", template="plotly_dark")
-st.plotly_chart(fig_cash, use_container_width=True)
+col1, col2, col3 = st.columns([1, 2, 1]) 
+with col2:
+    if st.button("VER ACTIVOS EN PRODUCCIÓN", icon=":material/query_stats:"):
+        st.switch_page("pages/01_Vista_Global.py")
 
 
-# Empaquetamos la información para el reporte
-datos_para_reporte = {
-    "qi": qi_real,
-    "brent": precio_brent,
-    "q_limite": q_limite,
-    "opex": opex_total_diario.mean(), # Usamos el promedio diario
-    "estado": "OPERACION RENTABLE" if dia_final == 730 else f"ALERTA DE CIERRE (Día {dia_final})",
-    "dia_quiebre": dia_final
-}
+st.divider()
+st.space(30)
+# Sección de Perfil Profesional (Tu firma de LinkedIn)
+col_perfil, col_info = st.columns([1, 3])
 
-st.sidebar.divider()
-st.sidebar.subheader("Reportes")
-
-# Generamos el PDF en memoria
-try:
-    pdf_bytes = crear_informe_ejecutivo(datos_para_reporte)
-
-    st.sidebar.download_button(
-        label="📥 Descargar Reporte PDF",
-        data=pdf_bytes,
-        file_name=f"Reporte_Produccion_2026_{datetime.now().strftime('%d%m%y')}.pdf",
-        mime="application/pdf"
-    )
-except Exception as e:
-    st.sidebar.error("Error al generar PDF. Verifique fpdf2.")
-
-
-# Una línea divisoria para separar el análisis de la firma
-
-st.divider() 
-
-# Ajustamos el ancho de las columnas (1 parte para imagen, 4 para el texto)
-col_perfil, col_cita = st.columns([1, 4])
 with col_perfil:
-    # El parámetro use_container_width asegura que se adapte al espacio
-    st.image("assets/img/imagen.png", width=120)
+    st.image("assets/img/imagen.png", width=240)
 
-with col_cita:
-    st.markdown(
-        """
-        <div style="
-            padding-top: 10px;
-            border-left: 3px solid #FF4B4B;
-            padding-left: 20px;
-            font-style: italic;
-            color: #E0E0E0;
-            line-height: 1.6;
-        ">
-            "Diseñé una herramienta de monitoreo en tiempo real que integra la declinación de Arps 
-            con la volatilidad del Brent para predecir el punto de cierre económico"
-        </div>
-        """, 
-        unsafe_allow_html=True
-    )
+with col_info:
+    # Tu titular de LinkedIn con estilo
+    st.markdown(f"""
+    ### **Silvio Rojas**
+    #### **IT/OT Operations Analyst | Asset Integrity & Field Data | SQL · Python**
+    
+    *Especialista en la optimización de activos mediante el análisis de datos operativos y de integridad en tiempo real. Desarrollando soluciones analíticas para la Cuenca Neuquina.*
+    
+    [![LinkedIn](https://img.shields.io/badge/LinkedIn-Profile-blue?style=flat&logo=linkedin)](https://www.linkedin.com/in/silviojonrojas) 
+    """)
+
+# Una pequeña caja con tu "Propuesta de Valor"
+st.info("""
+**Propuesta de Valor:** Transformo volúmenes de datos críticos en tableros de control ejecutivos que permiten predecir el límite económico y optimizar la vida útil de los pozos en Vaca Muerta.
+""")
