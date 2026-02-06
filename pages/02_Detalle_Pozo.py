@@ -11,12 +11,12 @@ from src.petro_logic import calcular_q_limite, proyectar_produccion, calcular_fl
 
 st.set_page_config(layout="wide", page_title="Monitor Vaca Muerta")
 
-
-# Buscamos si hay algo en la memoria, si no, usamos uno por defecto
 if 'pozo_seleccionado' in st.session_state:
     pozo_actual = st.session_state['pozo_seleccionado']
 else:
     st.switch_page("main.py") 
+
+
    
 # --- 1. LECTURA DE DATOS DINÁMICA ---
 @st.cache_data
@@ -24,34 +24,51 @@ def cargar_datos_pozo(id_buscado):
     try:
         # Leemos el archivo masivo que tiene los 100 pozos
         df_masivo = pd.read_csv('datos/datos_campo_masivos.csv')
-        df_masivo['pozo_id'] = df_masivo['pozo_id'].astype(str).str.strip()
+        df_limpio = df_masivo[df_masivo['prod_real_bpd'] > 0].copy()
+        df_limpio = df_limpio[df_limpio['prod_real_bpd'] < 5000]
+        # Aseguramos que la declinación no sea cero para evitar errores matemáticos
+        #Manejo de la Declinación (di)
+        if 'di' not in df_limpio.columns:
+            df_limpio['di'] = (df_limpio['prod_teorica_bpd'] - df_limpio['prod_real_bpd']) / df_limpio['prod_teorica_bpd']
+            
+            # Limpiamos el cálculo: si da negativo o cero, ponemos un mínimo técnico
+            df_limpio['di'] = df_limpio['di'].apply(lambda x: x if x > 0 else 0.001)
+            # Capamos la declinación máxima al 5% diario para evitar distorsiones
+            df_limpio['di'] = df_limpio['di'].clip(upper=0.05)
+
+        # Reporte de limpieza en consola (para tu seguimiento como Analista)
+        filas_eliminadas = len(df_masivo) - len(df_limpio)
+        if filas_eliminadas > 0:
+             print(f"Resiliencia: Se omitieron {filas_eliminadas} registros inconsistentes.")
+
+        df_limpio['pozo_id'] = df_limpio['pozo_id'].astype(str).str.strip()
         id_buscado = str(id_buscado).strip()
         
         # Filtramos por el pozo que viene de la memoria (pozo_actual)
-        datos_pozo = df_masivo[df_masivo['pozo_id'] == id_buscado]
+        datos_pozo = df_limpio[df_limpio['pozo_id'] == id_buscado]
         
         if not datos_pozo.empty:
             q_inicio = float(datos_pozo['prod_real_bpd'].values[0])
             bsw_raw = float(datos_pozo['water_cut'].values[0])
+            di_calculado = float(datos_pozo['di'].values[0])
             bsw_real = bsw_raw / 100 if bsw_raw > 1 else bsw_raw
-            return q_inicio, bsw_real
+            return q_inicio, bsw_real, di_calculado
         else:
            # Si entra acá, es que el ID buscado no existe en el CSV
             st.error(f"ID '{id_buscado}' no encontrado en el archivo masivo.")
-            return 500.0, 0.15
+            return 500.0, 0.15, 0.005
     except Exception as e:
         st.error(f"Error de lectura: {e}")
         return 874.1, 0.30
 
 # EJECUCIÓN: Ahora le pasamos el 'pozo_actual' que recuperamos arriba
-qi_real, bsw = cargar_datos_pozo(pozo_actual)
+qi_real, bsw, di_real = cargar_datos_pozo(pozo_actual)
 
 # Línea de depuración (Borrar después)
 # st.write(f'⚠️ DEBUG: Produccion Real bdp:{qi_real}    | Water Cut: {bsw} ')
 
 # --- INTERFAZ ---
 st.title(f"🛢️ Centro de Control Operativo | Analizando Pozo: **{pozo_actual}**")
-# st.info(f" (Cargado desde Vista Global)")
 # Parámetros en el Sidebar
 st.sidebar.header("Variables de Mercado")
 precio_brent = st.sidebar.slider("Precio Brent (USD/bbl)", 40, 120, 75)
@@ -69,10 +86,18 @@ horizonte_proyeccion = st.sidebar.slider("Horizonte de Análisis (Días)", 30, 1
 m_std=30  # mes estándar de 30 días
 
 # A. Cálculo de Punto de Equilibrio
-q_limite = calcular_q_limite(opex_base/m_std, precio_brent, regalias)
+q_limite = calcular_q_limite(
+    opex_base/m_std, 
+    precio_brent, 
+    regalias
+    )
 
 # B. Proyección de Producción (200 días)
-dias, prod_proyectada = proyectar_produccion(qi=qi_real, di=0.005, dias_proyeccion=horizonte_proyeccion)
+dias, prod_proyectada = proyectar_produccion(
+    qi=qi_real, 
+    di=di_real, 
+    dias_proyeccion=horizonte_proyeccion
+    )
 
 # C. Cálculo de OPEX Variable (Emulsión)
 
@@ -82,20 +107,49 @@ opex_total_diario = (opex_base / m_std) + costo_emulsion_diario
 
 
 # D. Flujo de Caja
-cash_flow_diario, cash_flow_acumulado = calcular_flujo_caja(prod_proyectada, precio_brent, opex_total_diario, regalias)
+cash_flow_diario, cash_flow_acumulado = calcular_flujo_caja(
+    prod_proyectada, 
+    precio_brent, 
+    opex_total_diario, 
+    regalias
+    )
 
 # --- VISUALIZACIÓN ---
 fig = go.Figure()
 
 # Curva de producción
-fig.add_trace(go.Scatter(x=dias, y=prod_proyectada, name='Producción Proyectada', line=dict(color='#FF4B4B', width=3)))
+fig.add_trace(go.Scatter(x=dias, 
+                         y=prod_proyectada, 
+                         name='Producción Proyectada', 
+                         line=dict(color='#FF4B4B', width=3),
+                         hovertemplate='Día: %{x}<br>Prod: %{y:.1f} bbl/d<extra></extra>'))
 
 # Línea dinámica de Límite Económico
-fig.add_hline(y=q_limite, line_dash="dash", line_color="#00FF00", 
-              annotation_text=f"Límite Económico: {q_limite:.1f} bbl/d", 
-              annotation_position="bottom right")
+fig.add_hline(
+    y=q_limite, 
+    line_dash="dash", 
+    line_color="#00FF00", 
+    annotation_text=f"Límite Económico: {q_limite:.1f} bbl/d", 
+    annotation_position="bottom right"
+    )
+fig.add_annotation(
+    x=horizonte_proyeccion * 0.8, # La posicionamos al final del gráfico
+    y=prod_proyectada[0] * 0.9,
+    text=f"Tasa de Declinación (di): <b>{di_real*100:.2f}%</b>",
+    showarrow=False,
+    font=dict(size=14, color="white"),
+    bgcolor="rgba(255, 75, 75, 0.6)",
+    bordercolor="#FF4B4B",
+    borderwidth=1
+    )
 
-fig.update_layout(title='Análisis de Viabilidad Económica', xaxis_title='Días desde hoy', yaxis_title='Producción (bbl/d)', template="plotly_dark")
+fig.update_layout(
+    title='Análisis de Viabilidad Económica', 
+    xaxis_title='Días de Proyección', 
+    yaxis_title='Barriles por Día (bpd)', 
+    template="plotly_dark",
+    hovermode="x unified"
+    )
 st.plotly_chart(fig, use_container_width=True)
 
 # --- MÉTRICAS CRÍTICAS ---
@@ -135,14 +189,25 @@ col_cf1, col_cf2 = st.columns(2)
 
 with col_cf1:
     fig_cf = go.Figure()
-    fig_cf.add_trace(go.Bar(x=dias, y=cash_flow_diario, name='CF Diario', marker_color='royalblue'))
-    fig_cf.update_layout(title="Flujo de Caja Diario (USD)", template="plotly_dark")
+    fig_cf.add_trace(go.Bar(
+        x=dias, 
+        y=cash_flow_diario, 
+        name='CF Diario', 
+        marker_color='royalblue')
+        )
+    fig_cf.update_layout(
+        title="Flujo de Caja Diario (USD)", 
+        template="plotly_dark"
+        )
     st.plotly_chart(fig_cf, use_container_width=True)
 
 with col_cf2:
     fig_acum = go.Figure()
     fig_acum.add_trace(go.Scatter(x=dias, y=cash_flow_acumulado, fill='tozeroy', name='CF Acumulado', line=dict(color='gold')))
-    fig_acum.update_layout(title="Rentabilidad Acumulada Anual (USD)", template="plotly_dark")
+    fig_acum.update_layout(
+        title="Rentabilidad Acumulada Anual (USD)", 
+        template="plotly_dark"
+        )
     st.plotly_chart(fig_acum, use_container_width=True)
 
 

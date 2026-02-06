@@ -30,5 +30,7 @@ def calcular_flujo_caja(prod_proyectada, precio_brent, opex_total_diario, regali
     """Calcula el cash flow diario y acumulado."""
     ingreso_neto = prod_proyectada * precio_brent * (1 - regalias)
     cf_diario = ingreso_neto - opex_total_diario
-    cf_acumulado = np.cumsum(cf_diario)
+    mascara_rentabilidad = cf_diario > 0
+    cf_diario_positivo = np.where(mascara_rentabilidad, cf_diario, 0)
+    cf_acumulado = np.cumsum(cf_diario_positivo)
     return cf_diario, cf_acumulado

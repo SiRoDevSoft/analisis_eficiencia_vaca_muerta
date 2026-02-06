@@ -56,11 +56,11 @@ def generar_pdf_final(df_analisis):
     print("✅ ¡EXITO! Archivo 'Reporte_Produccion_Anelo.pdf' generado en tu carpeta.")
 
 # 2. EJECUCIÓN (Usando el combustible que recargamos antes)
-generar_pdf_final(df_masivo)
+# generar_pdf_final(df_masivo)
 
 # Verificamos que df_masivo tenga los datos necesarios
-if 'perdida_usd_dia' in df_masivo.columns:
-    crear_pdf_productividad(df_masivo)
-    print("🚀 ¡Listo! Buscá el archivo 'Reporte_Produccion_Anelo.pdf' en la carpeta de tu proyecto.")
-else:
-    print("⚠️ Error: Primero debés calcular la columna 'perdida_usd_dia' como hicimos ayer.")
+# if 'perdida_usd_dia' in df_masivo.columns:
+#     crear_pdf_productividad(df_masivo)
+#     print("🚀 ¡Listo! Buscá el archivo 'Reporte_Produccion_Anelo.pdf' en la carpeta de tu proyecto.")
+# else:
+#     print("⚠️ Error: Primero debés calcular la columna 'perdida_usd_dia' como hicimos ayer.")
