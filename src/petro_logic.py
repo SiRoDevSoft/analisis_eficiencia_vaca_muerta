@@ -1,6 +1,6 @@
 # src/petro_logic.py
 import numpy as np
-import os
+from pathlib import Path
 
 def calcular_q_limite(opex_diario, precio_brent, regalias=0.12):
     """Calcula el punto de equilibrio económico (Qel) con blindaje."""
@@ -37,14 +37,14 @@ def calcular_flujo_caja(prod_proyectada, precio_brent, opex_total_diario, regali
     return cf_diario, cf_acumulado
 
 def get_documentation_pdf(file_path):
-    """
-    Lee el archivo PDF de documentación y devuelve su contenido en bytes.
-    """
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "rb") as f:
-                return f.read()
-        except Exception as e:
-            print(f"Error al leer el PDF: {e}")
-            return None
+   def get_documentation_pdf():
+    # Definimos la raíz del proyecto (Project Root) de forma absoluta
+    # Path(__file__).resolve() nos da la ubicación real sin importar el SO
+    current_dir = Path(__file__).resolve().parent # /src
+    project_root = current_dir.parent             # Raíz del proyecto
+    
+    pdf_path = project_root / "assets" / "pdf" / "documentation.pdf"
+
+    if pdf_path.exists():
+        return pdf_path.read_bytes()
     return None

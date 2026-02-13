@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from src.petro_logic import calcular_q_limite
-from src.petro_logic import get_documentation_pdf
+from src.petro_logic import calcular_q_limite, get_documentation_pdf
+
 
 st.set_page_config(page_title="Proyecto Añelo 2026", layout="wide")
 st.title("🛢️ Sistema de Gestión de Activos - VACA MUERTA 2026")
