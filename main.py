@@ -94,7 +94,7 @@ st.sidebar.space(500)
 st.sidebar.divider()
 st.sidebar.title("Documentación")
 # Llamamos a la lógica para obtener el archivo
-pdf_bytes = get_documentation_pdf("assets/pdf/documentation.pdf")
+pdf_bytes = get_documentation_pdf()
 
 if pdf_bytes:
     st.sidebar.download_button(

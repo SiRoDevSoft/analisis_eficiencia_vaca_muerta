@@ -37,14 +37,8 @@ def calcular_flujo_caja(prod_proyectada, precio_brent, opex_total_diario, regali
     return cf_diario, cf_acumulado
 
 def get_documentation_pdf():
-    # 1. Ubicamos dónde está petro_logic.py (root/src/petro_logic.py)
-    current_file = Path(__file__).resolve()
-    
-    # 2. Subimos dos niveles para llegar a la raíz del proyecto
-    # parent = src/, parent.parent = raíz del proyecto
-    project_root = current_file.parent.parent
-    
-    # 3. Construimos la ruta hacia el PDF
+ # Detecta la raíz del proyecto dinámicamente
+    project_root = Path(__file__).resolve().parent.parent
     pdf_path = project_root / "assets" / "pdf" / "documentation.pdf"
 
     if pdf_path.exists():
