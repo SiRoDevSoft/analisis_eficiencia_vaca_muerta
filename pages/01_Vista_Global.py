@@ -87,6 +87,7 @@ else:
 st.dataframe(df_ver.sort_values(by='Margen_BPD', ascending=True), use_container_width=True)
 
 
+
 # --- CONECTOR A DETALLE ---
 st.divider()
 st.subheader("🔍 Análisis Profundo")
@@ -96,3 +97,5 @@ if st.button("Ver Análisis Detallado"):
     st.session_state['pozo_seleccionado'] = pozo_elegido
     st.switch_page("pages/02_Detalle_Pozo.py")
    
+
+

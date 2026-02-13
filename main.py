@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from src.petro_logic import calcular_q_limite
+from src.petro_logic import get_documentation_pdf
 
 st.set_page_config(page_title="Proyecto Añelo 2026", layout="wide")
 st.title("🛢️ Sistema de Gestión de Activos - VACA MUERTA 2026")
@@ -88,3 +89,21 @@ with col_info:
 st.info("""
 **Propuesta de Valor:** Transformo volúmenes de datos críticos en tableros de control ejecutivos que permiten predecir el límite económico y optimizar la vida útil de los pozos en Vaca Muerta.
 """)
+
+st.sidebar.space(500)
+st.sidebar.divider()
+st.sidebar.title("Documentación")
+# Llamamos a la lógica para obtener el archivo
+pdf_bytes = get_documentation_pdf("assets/pdf/documentation.pdf")
+
+if pdf_bytes:
+    st.sidebar.download_button(
+        label="User Manual (PDF)",
+        data=pdf_bytes,
+        file_name="Manual_Usuario_Vaca_Muerta.pdf",
+        mime="application/pdf"
+    )
+else:
+    st.sidebar.error("Documentación no disponible")
+
+st.sidebar.markdown("[🔬 Engineering Manual (GitHub)](https://github.com/SiRoDevSoft/analisis_eficiencia_vaca_muerta)")
