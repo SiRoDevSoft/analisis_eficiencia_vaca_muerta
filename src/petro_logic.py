@@ -2,6 +2,21 @@
 import numpy as np
 from pathlib import Path
 
+from src.sanitizer import filter_by_integrity 
+
+def sanitize_production_data(raw_data_list):
+    """
+    Recibe la lista de producción del CSV y devuelve una lista sin ruidos.
+    """
+    clean_data = []
+    for i, value in enumerate(raw_data_list):
+       
+        window = raw_data_list[:i] 
+        sanitized_value = filter_by_integrity(value, window)
+        clean_data.append(sanitized_value)
+    return clean_data
+
+
 def calcular_q_limite(opex_diario, precio_brent, regalias=0.12):
     """Calcula el punto de equilibrio económico (Qel) con blindaje."""
     try:

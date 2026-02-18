@@ -1,20 +1,31 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from src.petro_logic import calcular_q_limite, get_documentation_pdf
+from src.petro_logic import calcular_q_limite, get_documentation_pdf, sanitize_production_data
 
 
 st.set_page_config(page_title="Proyecto Añelo 2026", layout="wide")
 st.title("🛢️ Sistema de Gestión de Activos - VACA MUERTA 2026")
 
-
+# Sanitización de datos SCADA
+# 1. Simulamos la lectura del dato crudo
 df_campo = pd.read_csv('datos/datos_campo_masivos.csv')
+
+# 2. SANITIZACIÓN
+# Supongamos que limpiamos la columna de producción real
+produccion_sucia = df_campo['prod_real_bpd'].tolist()
+produccion_limpia = sanitize_production_data(produccion_sucia)
+
+# 3. Reemplazamos en el DataFrame para que todo lo demás use el dato limpio
+df_campo['prod_real_bpd'] = produccion_limpia
+
 
 st.sidebar.header("Condiciones de Mercado")
 precio_brent = st.sidebar.slider("Precio Brent (USD/bbl)", 40, 120, 75)
 regalias = 0.12
 opex_fijo_mensual = 50000 
 
+# 4. Ahora sí, calculás rentabilidad y proyecciones con datos confiables
 q_lim_estandar = calcular_q_limite(opex_fijo_mensual/30, precio_brent, regalias)
 
 # Filtramos pozos saludables (por encima del límite)
