@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from src.petro_logic import calcular_q_limite, get_documentation_pdf, sanitize_production_data
+from src.sanitizer import inject_demo_fault # Importamos el "inyector" de ruido
 
 
 st.set_page_config(page_title="Proyecto Añelo 2026", layout="wide")
@@ -10,6 +11,32 @@ st.title("🛢️ Sistema de Gestión de Activos - VACA MUERTA 2026")
 # Sanitización de datos SCADA
 # 1. Simulamos la lectura del dato crudo
 df_campo = pd.read_csv('datos/datos_campo_masivos.csv')
+
+
+# 1.2. INTERFAZ DE CAOS (Sidebar)
+st.sidebar.subheader("🧪 Stress Test: Integridad")
+tipo_ruido = st.sidebar.selectbox(
+    "Simular falla en sensores:",
+    ["Ninguno", "Pico de Gas (Outlier Alto)", "Falla Eléctrica (Cero)", "Inestabilidad"]
+)
+
+# 1.3. PROCESAMIENTO
+raw_list = df_campo['prod_real_bpd'].tolist()
+
+# Primero "ensuciamos" si el usuario quiere
+data_to_process = inject_demo_fault(raw_list, tipo_ruido)
+
+# Luego "sanitizamos" con tu lógica de Z-Score
+clean_list = sanitize_production_data(data_to_process)
+
+# Actualizamos el DataFrame para los gráficos
+df_campo['prod_real_bpd'] = clean_list
+
+# 1.4. FEEDBACK VISUAL
+if tipo_ruido != "Ninguno":
+    outliers = sum(1 for r, c in zip(data_to_process, clean_list) if r != c)
+    if outliers > 0:
+        st.sidebar.warning(f"✅ Filtro de Resiliencia: {outliers} error(es) detectado(s) y eliminado(s) del gráfico.")
 
 # 2. SANITIZACIÓN
 # Supongamos que limpiamos la columna de producción real
@@ -61,7 +88,8 @@ fig_dist = px.histogram(df_campo, x="prod_real_bpd",
                          title="Distribución de Pozos según Rentabilidad Actual",
                          labels={'prod_real_bpd': 'Producción (bpd)', 'rentable': 'Es Rentable'},
                          color_discrete_map={True: '#00FF00', False: '#FF4B4B'},
-                         template="plotly_dark")
+                         template="plotly_dark",
+                         range_x=[0, 1000])
 
 # Línea de referencia del límite económico en el gráfico
 fig_dist.add_vline(x=q_lim_estandar, line_dash="dash", line_color="yellow", annotation_text="Punto de Equilibrio")
