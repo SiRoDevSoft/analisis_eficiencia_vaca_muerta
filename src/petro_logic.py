@@ -2,7 +2,7 @@
 import numpy as np
 from pathlib import Path
 
-from .sanitizer import filter_by_integrity 
+from src.sanitizer import filter_by_integrity 
 
 def sanitize_production_data(raw_data_list):
     """
