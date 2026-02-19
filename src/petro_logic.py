@@ -6,14 +6,26 @@ from src.sanitizer import filter_by_integrity
 
 def sanitize_production_data(raw_data_list):
     """
-    Recibe la lista de producción del CSV y devuelve una lista sin ruidos.
+    Sanitiza la producción usando Z-Score sobre el set completo.
+    Detecta valores absurdos y ruidos estadísticos.
     """
+    if not raw_data_list:
+        return []
+
+    data = np.array(raw_data_list)
+    mean = np.nanmean(data)
+    std = np.nanstd(data)
+    
+    # Definimos un umbral de Z-Score (3 es el estándar industrial)
+    # También agregamos un límite físico para Vaca Muerta (ej: 2500 bpd)
     clean_data = []
-    for i, value in enumerate(raw_data_list):
-       
-        window = raw_data_list[:i] 
-        sanitized_value = filter_by_integrity(value, window)
-        clean_data.append(sanitized_value)
+    for value in data:
+            # Si el valor es nulo, absurdo (>2500) o estadísticamente loco
+            if np.isnan(value) or value > 2500 or abs((value - mean) / std) > 3:
+                clean_data.append(mean)
+            else:
+                clean_data.append(value)
+                
     return clean_data
 
 

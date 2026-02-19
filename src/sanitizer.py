@@ -14,6 +14,8 @@ def inject_demo_fault(data_list, fault_type):
         corrupted_data[0] = 1800.0 
     elif fault_type == "Falla Eléctrica (Cero)":
         corrupted_data[0] = 0.0
+    elif fault_type == "Producción Absurda (Error Crítico)":
+        corrupted_data[0] = 5000.0
     elif fault_type == "Inestabilidad (Ruido Blanco)":
         corrupted_data = [v * np.random.uniform(0.5, 2.0) for v in corrupted_data]
         

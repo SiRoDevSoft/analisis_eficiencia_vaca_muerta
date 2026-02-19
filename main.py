@@ -17,7 +17,7 @@ df_campo = pd.read_csv('datos/datos_campo_masivos.csv')
 st.sidebar.subheader("🧪 Stress Test: Integridad")
 tipo_ruido = st.sidebar.selectbox(
     "Simular falla en sensores:",
-    ["Ninguno", "Pico de Gas (Outlier Alto)", "Falla Eléctrica (Cero)", "Inestabilidad"]
+    ["Ninguno", "Pico de Gas (Outlier Alto)", "Falla Eléctrica (Cero)", "Producción Absurda (Error Crítico)", "Inestabilidad"]
 )
 
 # 1.3. PROCESAMIENTO
@@ -29,23 +29,27 @@ data_to_process = inject_demo_fault(raw_list, tipo_ruido)
 # Luego "sanitizamos" con tu lógica de Z-Score
 clean_list = sanitize_production_data(data_to_process)
 
+
 # Actualizamos el DataFrame para los gráficos
 df_campo['prod_real_bpd'] = clean_list
 
+st.divider()
 # 1.4. FEEDBACK VISUAL
 if tipo_ruido != "Ninguno":
+    # 1. Calculamos outliers totales
     outliers = sum(1 for r, c in zip(data_to_process, clean_list) if r != c)
-    if outliers > 0:
-        st.sidebar.warning(f"✅ Filtro de Resiliencia: {outliers} error(es) detectado(s) y eliminado(s) del gráfico.")
-
-# 2. SANITIZACIÓN
-# Supongamos que limpiamos la columna de producción real
-produccion_sucia = df_campo['prod_real_bpd'].tolist()
-produccion_limpia = sanitize_production_data(produccion_sucia)
-
-# 3. Reemplazamos en el DataFrame para que todo lo demás use el dato limpio
-df_campo['prod_real_bpd'] = produccion_limpia
-
+    
+    # 2. CARTEL ROJO: Lo forzamos por el nombre de la opción o por detección
+    if tipo_ruido == "Producción Absurda (Error Crítico)" or abs(data_to_process[0] - clean_list[0]) > 10:
+        st.error(f"""
+            ### 🚨 Detección de Ruido: Valor corregido
+            Se detectó una lectura crítica de **{data_to_process[0]:,.2f} bpd**.  
+            **Acción del Sistema:** El algoritmo ha filtrado el valor y lo ha reemplazado por la media estadística de **{clean_list[0]:,.2f} bpd**.
+        """)
+    
+    # 3. WARNING SIDEBAR: Para errores menores (picos de gas, etc)
+    if outliers > 0 and tipo_ruido != "Producción Absurda (Error Crítico)":
+        st.sidebar.warning(f"⚠️ Filtro de Resiliencia: {outliers} anomalías detectadas.")
 
 st.sidebar.header("Condiciones de Mercado")
 precio_brent = st.sidebar.slider("Precio Brent (USD/bbl)", 40, 120, 75)
