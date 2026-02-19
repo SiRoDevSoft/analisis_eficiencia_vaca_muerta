@@ -5,19 +5,11 @@ from pathlib import Path
 from src.sanitizer import filter_by_integrity 
 
 def sanitize_production_data(raw_data_list):
-    # """
-    # Sanitiza la producción usando Z-Score sobre el set completo.
-    # Detecta valores absurdos y ruidos estadísticos.
-    # """
-    # if not raw_data_list:
-    #     return []
 
     data = np.array(raw_data_list)
     mean = np.nanmean(data)
     std = np.nanstd(data)
-    
-    # Definimos un umbral de Z-Score (3 es el estándar industrial)
-    # También agregamos un límite físico para Vaca Muerta (ej: 2500 bpd)
+
     clean_data = []
     for value in data:
             # Si el valor es nulo, absurdo (>2500) o estadísticamente loco
