@@ -6,7 +6,7 @@ from src.sanitizer import inject_demo_fault # Importamos el "inyector" de ruido
 
 
 st.set_page_config(page_title="Proyecto Añelo 2026", layout="wide")
-st.title("🛢️ Sistema de Gestión de Activos - VACA MUERTA 2026")
+st.title("Integridad y Control de Activos: Cuenca Neuquina 2026")
 
 # Sanitización de datos SCADA
 # 1. Simulamos la lectura del dato crudo

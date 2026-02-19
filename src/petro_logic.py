@@ -5,12 +5,12 @@ from pathlib import Path
 from src.sanitizer import filter_by_integrity 
 
 def sanitize_production_data(raw_data_list):
-    """
-    Sanitiza la producción usando Z-Score sobre el set completo.
-    Detecta valores absurdos y ruidos estadísticos.
-    """
-    if not raw_data_list:
-        return []
+    # """
+    # Sanitiza la producción usando Z-Score sobre el set completo.
+    # Detecta valores absurdos y ruidos estadísticos.
+    # """
+    # if not raw_data_list:
+    #     return []
 
     data = np.array(raw_data_list)
     mean = np.nanmean(data)
